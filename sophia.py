@@ -49,7 +49,7 @@ body {
     background-color: #FAF8F5;
     background-image: 
         linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)),
-        url('https://images.unsplash.com/photo-1501769752-a59efa2298ce?w=2000&q=80');
+        url('https://images.unsplash.com/photo-1589394815804-964ed0be2eb5?w=2000&q=80');
     background-size: cover;
     background-attachment: fixed;
     background-position: center;
