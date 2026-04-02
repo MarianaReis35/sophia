@@ -142,7 +142,7 @@ def get():
             Form(
                 Group(
                     Input(name="user_input", placeholder="Digite sua mensagem para a SOPHIA...", required=True, id="msg-input", style="flex: 1;"),
-                    Button("➤ Enviar", type="submit", id="send-btn")
+                    Button("Enviar", type="submit", id="send-btn",style="flex:0")
                 ),
                 hx_post="/send", 
                 hx_target="#chat-window", 
