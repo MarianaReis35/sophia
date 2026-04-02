@@ -63,14 +63,29 @@ main {
 }
 #chat-window {
     background: rgba(255, 255, 255, 0.96);
-    border-radius: 15px;
+    border-radius: 15px 15px 0 0;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     backdrop-filter: blur(10px);
     height: 50vh;
     overflow-y: auto;
     padding: 2rem;
-    margin-bottom: 1.5rem;
     border: 1px solid #ddd;
+    border-bottom: none;
+}
+#chat-input-area {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 0 0 15px 15px;
+    padding: 1rem 2rem;
+    border: 1px solid #ddd;
+    border-top: 2px solid #007bff;
+    margin-bottom: 1.5rem;
+}
+#upload-area {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 10px;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    margin-bottom: 1rem;
 }
 #file-status {
     backdrop-filter: blur(5px);
@@ -114,47 +129,57 @@ def get():
             id="modal-estatistica"
         ),
         
+        # Janela de conversa
         Div(
             P("👋 Olá! Sou a SOPHIA, sua analista de dados sênior.", style="color: #666; text-align: center; margin-top: 1rem;"),
             P("Faça upload de um arquivo ou consulte o Data Lake para começar.", style="color: #999; text-align: center; font-size: 0.9rem;"),
             id="chat-window"
         ),
         
-        # Upload de arquivo (separado)
-        Form(
-            Label("Anexar arquivo para análise (opcional):"),
-            Group(
+        # Campo de mensagem dentro da área de chat
+        Div(
+            Div(Span(cls="loading"), Span(" SOPHIA está pensando..."), id="send-loading", cls="htmx-indicator", style="color: #007bff; margin-bottom: 0.5rem;"),
+            Form(
+                Group(
+                    Input(name="user_input", placeholder="Digite sua mensagem para a SOPHIA...", required=True, id="msg-input", style="flex: 1;"),
+                    Button("➤ Enviar", type="submit", id="send-btn")
+                ),
+                hx_post="/send", 
+                hx_target="#chat-window", 
+                hx_swap="beforeend",
+                hx_indicator="#send-loading",
+                id="chat-form",
+                onsubmit="document.getElementById('send-btn').disabled=true;"
+            ),
+            id="chat-input-area"
+        ),
+        
+        # Área de upload de arquivo
+        Div(
+            Button("📎 Anexar arquivo", id="attach-btn", onclick="document.getElementById('file-input').click();", style="width: 100%; margin-bottom: 0.5rem;"),
+            Form(
                 Input(type="file", name="file_upload", 
                       accept=".csv,.txt,.md,.pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.bmp,.webp,.py,.js,.html,.css,.json,.xml,.yaml,.yml", 
-                      id="file-input"),
-                Button("📄 Carregar Arquivo", type="submit", id="upload-btn")
+                      id="file-input",
+                      style="display: none;",
+                      onchange="document.getElementById('file-name').textContent = this.files[0]?.name || 'Nenhum arquivo selecionado'; document.getElementById('open-btn').style.display = this.files[0] ? 'inline-block' : 'none';"),
+                Div(
+                    Span(id="file-name", style="color: #666; font-size: 0.9rem;"),
+                    Button("Abrir", type="submit", id="open-btn", style="display: none; margin-left: 1rem;"),
+                    style="margin-bottom: 0.5rem;"
+                ),
+                hx_post="/upload",
+                hx_target="#file-status",
+                hx_encoding="multipart/form-data",
+                hx_indicator="#upload-loading",
+                onsubmit="document.getElementById('open-btn').disabled=true;"
             ),
-            hx_post="/upload",
-            hx_target="#file-status",
-            hx_encoding="multipart/form-data",
-            hx_indicator="#upload-loading",
-            style="margin-bottom: 1rem;",
-            onsubmit="document.getElementById('upload-btn').disabled=true;"
-        ),
-        Div(
-            Div(id="file-status", style="display: inline-block;"),
-            Div(Span(cls="loading"), Span(" Carregando arquivo..."), id="upload-loading", cls="htmx-indicator", style="margin-left: 10px; color: #007bff;")
-        , style="margin-bottom: 1rem; padding: 10px; min-height: 20px;"),
-        
-        # Campo de mensagem (separado)
-        Form(
-            Group(
-                Input(name="user_input", placeholder="Digite sua mensagem para a SOPHIA...", required=True, id="msg-input"),
-                Button("➤ Enviar", type="submit", id="send-btn")
+            Div(
+                Div(id="file-status"),
+                Div(Span(cls="loading"), Span(" Carregando..."), id="upload-loading", cls="htmx-indicator", style="color: #007bff;")
             ),
-            hx_post="/send", 
-            hx_target="#chat-window", 
-            hx_swap="beforeend",
-            hx_indicator="#send-loading",
-            id="chat-form",
-            onsubmit="document.getElementById('send-btn').disabled=true;"
+            id="upload-area"
         ),
-        Div(Span(cls="loading"), Span(" SOPHIA está pensando..."), id="send-loading", cls="htmx-indicator", style="color: #007bff; margin-bottom: 1rem;"),
         
         P(Small(f"📚 {len(arquivos_pdf)} documentos carregados no Data Lake.")),
         cls="container",
@@ -173,10 +198,11 @@ async def post_upload(file_upload: UploadFile):
     if not file_upload or not hasattr(file_upload, 'filename') or not file_upload.filename:
         return Div(
             P("⚠️ Nenhum arquivo selecionado."),
-            Script("document.getElementById('upload-btn').disabled=false;"),
+            Script("document.getElementById('open-btn').disabled=false;"),
             style="color: orange; background: #fff3cd; padding: 10px; border-radius: 5px;"
         )
     
+    # Retorna status de carregamento
     try:
         content = await file_upload.read()
         file_extension = Path(file_upload.filename).suffix.lower()
@@ -196,7 +222,6 @@ async def post_upload(file_upload: UploadFile):
         
         # Processar documentos Word/Excel
         elif file_extension in ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt']:
-            # Para esses formatos, vamos usar a API do Gemini diretamente
             current_file_data = content
             file_info = f"Tamanho: {len(content)} bytes"
         
@@ -216,23 +241,24 @@ async def post_upload(file_upload: UploadFile):
             current_file_type = None
             return Div(
                 P(f"⚠️ Formato de arquivo não suportado: {file_extension}"),
+                Script("document.getElementById('open-btn').disabled=false;"),
                 style="color: orange; background: #fff3cd; padding: 10px; border-radius: 5px;"
             )
         
         return Div(
-            P(f"✅ Arquivo '{file_upload.filename}' carregado com sucesso!"),
-            P(Small(f"Tipo: {file_extension} | {file_info}")),
-            Script("document.getElementById('upload-btn').disabled=false; document.getElementById('file-input').value='';"),
-            style="color: green; background: #d4edda; padding: 10px; border-radius: 5px;"
+            P(f"✅ Carregado: {file_upload.filename}"),
+            P(Small(f"{file_extension} | {file_info}"), style="color: #666;"),
+            Script("document.getElementById('open-btn').disabled=false; document.getElementById('open-btn').style.display='none'; document.getElementById('file-name').textContent='';"),
+            style="color: green; background: #d4edda; padding: 10px; border-radius: 5px; margin-top: 0.5rem;"
         )
     except Exception as e:
         current_file_data = None
         current_file_name = None
         current_file_type = None
         return Div(
-            P(f"❌ Erro ao carregar arquivo: {str(e)}"),
-            Script("document.getElementById('upload-btn').disabled=false;"),
-            style="color: red; background: #f8d7da; padding: 10px; border-radius: 5px;"
+            P(f"❌ Falha no carregamento: {str(e)}"),
+            Script("document.getElementById('open-btn').disabled=false;"),
+            style="color: red; background: #f8d7da; padding: 10px; border-radius: 5px; margin-top: 0.5rem;"
         )
 
 @rt("/send")
